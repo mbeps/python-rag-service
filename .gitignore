@@ -4,3 +4,4 @@ docs/**
 checklist.md
 **.pyc
 .env
+data/**
