@@ -1,0 +1,115 @@
+from typing import Optional, List
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, PointStruct, ScoredPoint
+
+
+class QdrantManager:
+    """
+    Manager for Qdrant vector database operations.
+    """
+
+    def __init__(self, host: str, port: int, api_key: Optional[str] = None):
+        """
+        Initializes the Qdrant client.
+
+        Args:
+            host: Qdrant server host.
+            port: Qdrant server port.
+            api_key: Optional API key for authentication.
+
+        Returns:
+            None
+        """
+        self.client: QdrantClient = QdrantClient(host=host, port=port, api_key=api_key)
+
+    async def ensure_collection(
+        self,
+        collection_name: str,
+        vector_size: int,
+        distance: Distance = Distance.COSINE,
+    ) -> None:
+        """
+        Ensures the collection exists in Qdrant.
+
+        Args:
+            collection_name: Name of the collection.
+            vector_size: Size of vectors.
+
+        Returns:
+            None
+        """
+        if not self.client.collection_exists(collection_name):
+            from qdrant_client.http.models import VectorParams
+
+            self.client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=distance),
+            )
+
+    async def upsert_points(
+        self, collection_name: str, points: List[PointStruct]
+    ) -> None:
+        """
+        Upserts points to a collection with retries on transient errors.
+
+        Args:
+            collection_name: Name of the collection.
+            points: List of points to upsert.
+
+        Returns:
+            None
+        """
+        import asyncio
+        from qdrant_client.http.exceptions import UnexpectedResponse
+
+        max_retries = 3
+        retry_delay = 0.1  # Small delay for tests
+
+        for attempt in range(max_retries):
+            try:
+                self.client.upsert(collection_name=collection_name, points=points)
+                return
+            except UnexpectedResponse as e:
+                # Retry on 5xx errors
+                if (
+                    isinstance(e.status_code, int)
+                    and e.status_code >= 500
+                    and attempt < max_retries - 1
+                ):
+                    await asyncio.sleep(retry_delay)
+                    continue
+                raise e
+
+    async def search(
+        self,
+        collection_name: str,
+        query_vector: List[float],
+        limit: int = 5,
+        kb_id: Optional[str] = None,
+    ) -> List[ScoredPoint]:
+        """
+        Performs similarity search, optionally filtered by kb_id.
+
+        Args:
+            collection_name: Name of the collection.
+            query_vector: The query vector.
+            limit: Maximum number of results to return.
+            kb_id: Optional knowledge base ID to filter by.
+
+        Returns:
+            List of ScoredPoint results.
+        """
+        query_filter = None
+        if kb_id:
+            from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+
+            query_filter = Filter(
+                must=[FieldCondition(key="kb_id", match=MatchValue(value=kb_id))]
+            )
+
+        return self.client.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            query_filter=query_filter,
+            limit=limit,
+        ).points
