@@ -42,4 +42,9 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+def get_settings() -> Settings:
+    """Returns the settings instance."""
+    return Settings()
+
+
+settings = get_settings()
