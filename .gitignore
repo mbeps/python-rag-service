@@ -5,3 +5,4 @@ checklist.md
 **.pyc
 .env
 data/**
+graphify-out/**

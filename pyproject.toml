@@ -27,4 +27,9 @@ dev = [
     "pytest-mock>=3.14.0",
     "mypy>=1.15.0",
     "ruff>=0.9.0",
+    "pyrefly>=1.1.1",
 ]
+
+[tool.pyrefly]
+# Explicitly set the project root as a search path to support 'src.' prefixed imports
+search-path = ["."]

@@ -1,4 +1,5 @@
 import pytest
+import httpx
 from unittest.mock import patch
 from qdrant_client.http.models import PointStruct, Filter, FieldCondition, MatchValue
 from qdrant_client.http.exceptions import UnexpectedResponse
@@ -101,7 +102,7 @@ async def test_ensure_collection_handles_error(mock_qdrant_client):
     """Test that ensure_collection propagates connection errors."""
     mock_instance = mock_qdrant_client.return_value
     mock_instance.collection_exists.side_effect = UnexpectedResponse(
-        500, "Internal Server Error", b"", {}
+        500, "Internal Server Error", b"", httpx.Headers()
     )
 
     manager = QdrantManager(host="localhost", port=6333)
@@ -116,8 +117,8 @@ async def test_upsert_points_retries_on_failure(mock_qdrant_client):
     mock_instance = mock_qdrant_client.return_value
     # Fail twice, then succeed
     mock_instance.upsert.side_effect = [
-        UnexpectedResponse(503, "Service Unavailable", b"", {}),
-        UnexpectedResponse(503, "Service Unavailable", b"", {}),
+        UnexpectedResponse(503, "Service Unavailable", b"", httpx.Headers()),
+        UnexpectedResponse(503, "Service Unavailable", b"", httpx.Headers()),
         None,
     ]
 

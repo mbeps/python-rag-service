@@ -23,7 +23,7 @@ def test_kb_metadata_valid():
 def test_kb_metadata_invalid():
     """Test KBMetadata with missing required fields."""
     with pytest.raises(ValidationError):
-        KBMetadata(kb_id="test-kb")
+        KBMetadata.model_validate({"kb_id": "test-kb"})
 
 
 def test_ingestion_request_valid():
@@ -36,6 +36,7 @@ def test_ingestion_request_valid():
     req = IngestionRequest(**data)
     assert req.kb_id == data["kb_id"]
     assert req.files == data["files"]
+    assert req.metadata is not None
     assert req.metadata["source"] == "web"
 
 
@@ -76,7 +77,7 @@ def test_query_response_valid():
 def test_query_response_invalid():
     """Test QueryResponse with missing fields."""
     with pytest.raises(ValidationError):
-        QueryResponse(answer="test", kb_id="test")
+        QueryResponse.model_validate({"answer": "test", "kb_id": "test"})
 
 
 def test_agent_state_valid():
