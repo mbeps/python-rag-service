@@ -130,3 +130,49 @@ class QdrantManager:
             query_filter=query_filter,
             limit=limit,
         ).points
+
+    async def list_kbs(self, collection_name: str) -> List[dict]:
+        """
+        Lists all Knowledge Bases in the registry.
+
+        Args:
+            collection_name: Name of the registry collection.
+
+        Returns:
+            List of metadata payloads.
+        """
+        # scroll to get all points
+        result, _ = self.client.scroll(
+            collection_name=collection_name,
+            with_payload=True,
+            with_vectors=False,
+            limit=100,  # ponytail: Defaulting to 100 for now.
+        )
+        return [point.payload for point in result if point.payload] if result else []
+
+    async def get_kb_metadata(self, collection_name: str, kb_id: str) -> Optional[dict]:
+        """
+        Retrieves metadata for a specific Knowledge Base.
+
+        Args:
+            collection_name: Name of the registry collection.
+            kb_id: Knowledge Base identifier.
+
+        Returns:
+            Metadata payload or None if not found.
+        """
+        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+
+        result, _ = self.client.scroll(
+            collection_name=collection_name,
+            scroll_filter=Filter(
+                must=[FieldCondition(key="kb_id", match=MatchValue(value=kb_id))]
+            ),
+            limit=1,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        if result and result[0].payload:
+            return result[0].payload
+        return None

@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from src.agent.graph import app
-from src.schemas.agent_state import AgentState
 
 
 @pytest.fixture

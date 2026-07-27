@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from src.ingestion.asset_processor import AssetProcessor
-from src.schemas.processed_chunk import ProcessedChunk
 
 
 @pytest.mark.asyncio
@@ -40,7 +39,7 @@ async def test_asset_processor_with_image():
 
     with (
         patch("src.ingestion.asset_processor.Image", MagicMock) as mock_img_type,
-        patch("src.ingestion.asset_processor.Table", MagicMock) as mock_tbl_type,
+        patch("src.ingestion.asset_processor.Table", MagicMock),
     ):
         processor = AssetProcessor(minio_manager=mock_minio)
 

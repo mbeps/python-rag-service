@@ -1,4 +1,3 @@
-import os
 from typing import Union
 
 from openai import OpenAI
@@ -13,10 +12,10 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
     to vector search retrieval, especially for complex or conversational queries.
 
     Args:
-        state (Union[AgentState, dict]): The current state containing the original 'query'.
+        state: The current graph state containing the original 'query'.
 
     Returns:
-        Union[AgentState, dict]: Updated state with 'rewritten_query'.
+        The updated state with the rewritten query.
     """
     settings = get_settings()
 

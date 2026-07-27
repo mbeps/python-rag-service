@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from pathlib import Path
 from openai import AsyncOpenAI
 from qdrant_client.http.models import PointStruct
@@ -34,10 +35,47 @@ class IngestionService:
         self.metadata_manager = metadata_manager
         self.asset_manager = asset_manager
         self.openai_client = AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL
+            api_key=settings.OPEN_API_KEY
+            if hasattr(settings, "OPEN_API_KEY")
+            else settings.OPENAI_API_KEY,  # Handle possible typo in settings if any
+            base_url=settings.OPENAI_BASE_URL,
         )
         # ponytail: "knowledge_base" is the default collection as per request.
         self.collection_name = "knowledge_base"
+
+    async def register_kb(self, kb_id: str, name: str, description: str) -> None:
+        """
+        Registers or updates a Knowledge Base in the global registry.
+        Generates an embedding for the description to allow dynamic KB selection.
+
+        Args:
+            kb_id (str): Unique identifier for the KB.
+            name (str): Human-readable name.
+            description (str): Summary of topics/domain.
+        """
+        await self.metadata_manager.ensure_collection(
+            collection_name=self.settings.KB_REGISTRY_COLLECTION, vector_size=1536
+        )
+
+        response = await self.openai_client.embeddings.create(
+            input=description, model=self.settings.EMBEDDING_MODEL
+        )
+        vector = response.data[0].embedding
+
+        payload = {
+            "kb_id": kb_id,
+            "name": name,
+            "description": description,
+            "created_at": datetime.now().isoformat(),
+        }
+
+        # Deterministic UUID for the KB in the registry
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, kb_id))
+
+        await self.metadata_manager.upsert_points(
+            collection_name=self.settings.KB_REGISTRY_COLLECTION,
+            points=[PointStruct(id=point_id, vector=vector, payload=payload)],
+        )
 
     async def ingest(self, file_path: Path, kb_id: str) -> None:
         """

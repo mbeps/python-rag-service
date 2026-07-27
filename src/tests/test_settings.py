@@ -7,6 +7,9 @@ def test_settings_defaults(monkeypatch):
     """Test that settings have correct default values."""
     # Ensure environment variables don't interfere with default tests
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("GENERATION_MODEL", raising=False)
     monkeypatch.delenv("QDRANT_API_KEY", raising=False)
 
     # We also need to bypass loading from .env for the default test

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Application Settings
     APP_NAME: str = "Agentic RAG Service"
     API_V1_STR: str = "/api/v1"
+    BACKEND_CORS_ORIGINS: list[str] = ["*"]
 
     # OpenAI-Compatible Provider Settings
     OPENAI_API_KEY: Optional[str] = None
