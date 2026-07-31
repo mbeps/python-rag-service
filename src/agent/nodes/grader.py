@@ -1,7 +1,7 @@
 import json
-from openai import OpenAI
 from src.config.settings import get_settings
 from src.schemas.agent_state import AgentState
+from src.utils.openai_client import get_openai_client
 
 
 async def grader_node(state: AgentState) -> AgentState:
@@ -17,7 +17,7 @@ async def grader_node(state: AgentState) -> AgentState:
     settings = get_settings()
 
     # Initialize OpenAI client
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_openai_client()
 
     # Prepare documents for prompt
     docs_text = "\n---\n".join([json.dumps(doc, indent=2) for doc in state.documents])
@@ -31,7 +31,7 @@ async def grader_node(state: AgentState) -> AgentState:
         "otherwise return 'not_relevant'. Return ONLY the status string."
     )
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=settings.GENERATION_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0,

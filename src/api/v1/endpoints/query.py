@@ -2,9 +2,11 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends
+from langchain_core.runnables import RunnableConfig
 from qdrant_client.http.models import ScoredPoint
 
 from src.config.settings import get_settings, Settings
+from src.utils.openai_client import get_openai_client
 from src.utils.qdrant_manager import QdrantManager
 from src.agent.graph import app as agent_app
 from src.schemas.query_request import QueryRequest
@@ -52,12 +54,17 @@ async def query_endpoint(
 
     # 1. Dynamic KB Selection if kb_id is missing
     if not kb_id:
-        # Search kb_registry for a matching knowledge base
-        # ponytail: Search assumes the 'query' string can be used as a vector
-        # by Qdrant's query_points (FastEmbed/Auto-inference).
+        # Embed the query and search kb_registry for a matching knowledge base
+        client = get_openai_client()
+        response = await client.embeddings.create(
+            input=request.query,
+            model=settings.EMBEDDING_MODEL,
+            encoding_format="float",
+        )
+        query_vector = response.data[0].embedding
         matches: List[ScoredPoint] = await qdrant.search(
             collection_name=settings.KB_REGISTRY_COLLECTION,
-            query=request.query,
+            query_vector=query_vector,
             limit=1,
         )
 
@@ -82,10 +89,13 @@ async def query_endpoint(
         documents=[],
         citations=[],
         visual_references=[],
+        answer=None,
+        rewritten_query=None,
+        grader_feedback=None,
     )
 
     # Invoke the compiled graph with a thread_id for state persistence
-    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    config: RunnableConfig = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
     try:
         # ainvoke returns the final state

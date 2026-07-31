@@ -22,9 +22,10 @@ class DocumentPartitioner:
             List[Element]: A list of chunked elements from the document.
         """
         # Partition the document
-        # Note: partition_pdf is heavy. In production, consider offloading to a worker.
+        # ponytail: hi_res requires system tesseract; fast uses pdfminer which
+        # handles text-based PDFs. Upgrade path: install tesseract and change to "hi_res".
         elements = partition_pdf(
-            filename=str(file_path), pdf_infer_table_structure=True, strategy="hi_res"
+            filename=str(file_path), pdf_infer_table_structure=True, strategy="fast"
         )
 
         # Chunk elements by title to preserve semantic structure

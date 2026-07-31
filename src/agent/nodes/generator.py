@@ -1,6 +1,6 @@
-from openai import OpenAI
 from src.config.settings import get_settings
 from src.schemas.agent_state import AgentState
+from src.utils.openai_client import get_openai_client
 
 
 async def generator_node(state: AgentState) -> AgentState:
@@ -15,7 +15,8 @@ async def generator_node(state: AgentState) -> AgentState:
             'visual_references' extracted from document metadata.
     """
     settings = get_settings()
-    client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
+
+    client = get_openai_client()
 
     # 1. Extract visual references
     # Iterate through documents and look for 'image_url'
@@ -45,7 +46,7 @@ async def generator_node(state: AgentState) -> AgentState:
     user_prompt = f"Context:\n{context_str}\n\nQuestion: {state.query}"
 
     # 4. Generate answer
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=settings.GENERATION_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},

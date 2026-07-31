@@ -59,3 +59,17 @@ def test_settings_invalid_float(monkeypatch):
     monkeypatch.setenv("DYNAMIC_KB_THRESHOLD", "not-a-float")
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_openai_api_key_stripped(monkeypatch):
+    """Test that OPENAI_API_KEY is stripped of whitespace and surrounding quotes."""
+    monkeypatch.setenv("OPENAI_API_KEY", '  "sk-or-v1-abc"  ')
+    settings = Settings(_env_file=None)
+    assert settings.OPENAI_API_KEY == "sk-or-v1-abc"
+
+
+def test_openai_api_key_blank_becomes_none(monkeypatch):
+    """Test that an empty OPENAI_API_KEY becomes None."""
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+    settings = Settings(_env_file=None)
+    assert settings.OPENAI_API_KEY is None

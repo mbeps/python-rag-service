@@ -5,7 +5,10 @@ from src.agent.graph import app
 
 @pytest.fixture
 def mock_retriever():
-    with patch("src.agent.nodes.retriever.QdrantManager", autospec=True) as mock:
+    with (
+        patch("src.agent.nodes.retriever.QdrantManager", autospec=True) as mock,
+        patch("src.agent.nodes.retriever.get_openai_client") as mock_client_factory,
+    ):
         mock_inst = mock.return_value
         mock_inst.search = AsyncMock(
             return_value=[
@@ -14,33 +17,41 @@ def mock_retriever():
                 )
             ]
         )
+        mock_client = mock_client_factory.return_value
+        mock_embedding = MagicMock()
+        mock_embedding.embedding = [0.1] * 8
+        mock_embedding_response = MagicMock()
+        mock_embedding_response.data = [mock_embedding]
+        mock_client.embeddings.create = AsyncMock(return_value=mock_embedding_response)
         yield mock_inst
 
 
 @pytest.fixture
 def mock_grader():
-    with patch("src.agent.nodes.grader.OpenAI", autospec=True) as mock:
-        mock_inst = mock.return_value
-        # Mocking the completions.create attribute chain
+    with patch("src.agent.nodes.grader.get_openai_client") as mock_factory:
+        mock_inst = mock_factory.return_value
         mock_cmpl = MagicMock()
+        mock_cmpl.create = AsyncMock()
         mock_inst.chat.completions = mock_cmpl
         yield mock_cmpl
 
 
 @pytest.fixture
 def mock_rewriter():
-    with patch("src.agent.nodes.rewriter.OpenAI", autospec=True) as mock:
-        mock_inst = mock.return_value
+    with patch("src.agent.nodes.rewriter.get_openai_client") as mock_factory:
+        mock_inst = mock_factory.return_value
         mock_cmpl = MagicMock()
+        mock_cmpl.create = AsyncMock()
         mock_inst.chat.completions = mock_cmpl
         yield mock_cmpl
 
 
 @pytest.fixture
 def mock_generator():
-    with patch("src.agent.nodes.generator.OpenAI", autospec=True) as mock:
-        mock_inst = mock.return_value
+    with patch("src.agent.nodes.generator.get_openai_client") as mock_factory:
+        mock_inst = mock_factory.return_value
         mock_cmpl = MagicMock()
+        mock_cmpl.create = AsyncMock()
         mock_inst.chat.completions = mock_cmpl
         yield mock_cmpl
 

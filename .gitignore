@@ -6,3 +6,5 @@ checklist.md
 .env
 data/**
 graphify-out/**
+.github/skills/**
+.vscode/settings.json

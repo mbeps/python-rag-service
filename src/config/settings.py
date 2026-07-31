@@ -1,4 +1,6 @@
 from typing import Optional
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +20,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSIONS: int = 1536
     GENERATION_MODEL: str = "gpt-4o-mini"
 
     # Qdrant Settings
@@ -34,6 +37,14 @@ class Settings(BaseSettings):
     # Knowledge Base Selection Settings
     KB_REGISTRY_COLLECTION: str = "kb_registry"
     DYNAMIC_KB_THRESHOLD: float = 0.65
+
+    @field_validator("OPENAI_API_KEY", mode="after")
+    @classmethod
+    def _strip_api_key(cls, value: Optional[str]) -> Optional[str]:
+        """Strip quotes/whitespace from the API key; empty becomes None."""
+        if isinstance(value, str):
+            value = value.strip().strip('"').strip("'")
+        return value or None
 
     model_config = SettingsConfigDict(
         env_file=".env",

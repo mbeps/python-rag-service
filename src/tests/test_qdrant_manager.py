@@ -1,6 +1,6 @@
 import pytest
 import httpx
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from qdrant_client.http.models import PointStruct, Filter, FieldCondition, MatchValue
 from qdrant_client.http.exceptions import UnexpectedResponse
 from src.config.settings import settings
@@ -45,14 +45,39 @@ async def test_ensure_collection_creates_if_not_exists(mock_qdrant_client):
 
 @pytest.mark.asyncio
 async def test_ensure_collection_skips_if_exists(mock_qdrant_client):
-    """Test that ensure_collection skips creation if collection exists."""
+    """Test that ensure_collection skips creation if collection exists with matching size."""
     mock_instance = mock_qdrant_client.return_value
     mock_instance.collection_exists.return_value = True
+
+    # Mock get_collection to return a collection with matching vector size
+    mock_collection_info = MagicMock()
+    mock_collection_info.config.params.vectors.size = 1536
+    mock_instance.get_collection.return_value = mock_collection_info
 
     manager = QdrantManager(host="localhost", port=6333)
     await manager.ensure_collection("test_col", vector_size=1536)
 
     mock_instance.collection_exists.assert_called_once_with("test_col")
+    mock_instance.create_collection.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ensure_collection_raises_on_size_mismatch(mock_qdrant_client):
+    """Test that ensure_collection raises on vector size mismatch without deleting."""
+    mock_instance = mock_qdrant_client.return_value
+    mock_instance.collection_exists.return_value = True
+
+    # Mock get_collection to return a collection with a different vector size
+    mock_collection_info = MagicMock()
+    mock_collection_info.config.params.vectors.size = 1536
+    mock_instance.get_collection.return_value = mock_collection_info
+
+    manager = QdrantManager(host="localhost", port=6333)
+
+    with pytest.raises(ValueError):
+        await manager.ensure_collection("test_col", vector_size=2048)
+
+    mock_instance.delete_collection.assert_not_called()
     mock_instance.create_collection.assert_not_called()
 
 

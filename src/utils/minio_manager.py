@@ -1,5 +1,7 @@
-from typing import BinaryIO
+import asyncio
+from typing import BinaryIO, List
 from minio import Minio
+from minio.datatypes import Bucket
 from minio.error import S3Error
 
 
@@ -38,10 +40,23 @@ class MinIOManager:
             None
         """
         try:
-            if not self.client.bucket_exists(bucket_name):
-                self.client.make_bucket(bucket_name)
+            exists = await asyncio.to_thread(self.client.bucket_exists, bucket_name)
+            if not exists:
+                await asyncio.to_thread(self.client.make_bucket, bucket_name)
         except S3Error as e:
             # Re-raise or handle specific S3 errors if needed
+            raise e
+
+    async def list_buckets(self) -> List[Bucket]:
+        """
+        Lists all available buckets.
+
+        Returns:
+            List[Bucket]: A list of bucket objects.
+        """
+        try:
+            return await asyncio.to_thread(self.client.list_buckets)
+        except S3Error as e:
             raise e
 
     async def upload_file(
@@ -73,8 +88,13 @@ class MinIOManager:
             raise ValueError("File size must be greater than zero")
 
         try:
-            self.client.put_object(
-                bucket_name, object_name, data, length, content_type=content_type
+            await asyncio.to_thread(
+                self.client.put_object,
+                bucket_name,
+                object_name,
+                data,
+                length,
+                content_type=content_type,
             )
             return object_name
         except S3Error as e:
@@ -97,8 +117,12 @@ class MinIOManager:
         from datetime import timedelta
 
         try:
-            url = self.client.get_presigned_url(
-                "GET", bucket_name, object_name, expires=timedelta(seconds=expires_in)
+            url = await asyncio.to_thread(
+                self.client.get_presigned_url,
+                "GET",
+                bucket_name,
+                object_name,
+                expires=timedelta(seconds=expires_in),
             )
             return url
         except S3Error as e:

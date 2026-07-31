@@ -99,6 +99,19 @@ async def test_get_presigned_url(mock_minio_client):
 
 
 @pytest.mark.asyncio
+async def test_list_buckets(mock_minio_client):
+    """Test that list_buckets returns a list of buckets."""
+    mock_instance = mock_minio_client.return_value
+    mock_instance.list_buckets.return_value = []
+
+    manager = MinIOManager("localhost:9000", "access", "secret")
+    buckets = await manager.list_buckets()
+
+    assert isinstance(buckets, list)
+    mock_instance.list_buckets.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_ensure_bucket_handles_error(mock_minio_client):
     """Test that ensure_bucket raises exception on connection failure."""
     mock_instance = mock_minio_client.return_value

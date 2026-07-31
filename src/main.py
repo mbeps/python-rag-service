@@ -1,10 +1,13 @@
 """Agentic RAG Service entry point."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from openai import AuthenticationError, NotFoundError
 
 from src.api.v1.api import api_router
 from src.config.settings import settings
@@ -30,7 +33,7 @@ async def lifespan(app: FastAPI):
             port=settings.QDRANT_PORT,
             api_key=settings.QDRANT_API_KEY,
         )
-        qdrant.client.get_collections()
+        await asyncio.to_thread(qdrant.client.get_collections)
         logger.info("Successfully connected to Qdrant.")
     except Exception as e:
         logger.error(f"Failed to connect to Qdrant: {e}")
@@ -45,11 +48,45 @@ async def lifespan(app: FastAPI):
             secret_key=settings.MINIO_SECRET_KEY,
             secure=settings.MINIO_SECURE,
         )
-        minio.client.list_buckets()
+        await minio.list_buckets()
         logger.info("Successfully connected to MinIO.")
     except Exception as e:
         logger.error(f"Failed to connect to MinIO: {e}")
         # raise e
+
+    # Verify OpenAI-compatible provider connectivity AND authentication
+    try:
+        from src.utils.openai_client import get_openai_client
+
+        client = get_openai_client()
+        try:
+            # OpenRouter exposes an authenticated /key endpoint; generic
+            # providers may not, so fall back to the models list (which is
+            # authenticated on OpenAI itself).
+            await client.get("/key", cast_to=httpx.Response)
+        except NotFoundError:
+            await client.models.list()
+        logger.info(
+            "Successfully connected to OpenAI-compatible provider (authenticated)."
+        )
+
+        # Probe the embedding model early to catch "model not found" at startup
+        await client.embeddings.create(
+            input="probe",
+            model=settings.EMBEDDING_MODEL,
+            encoding_format="float",
+        )
+        logger.info(f"Embedding model '{settings.EMBEDDING_MODEL}' is reachable.")
+    except AuthenticationError:
+        logger.error(
+            "OpenAI-compatible provider rejected the API key (401). "
+            "Set a valid OPENAI_API_KEY in your .env file (see .env.example)."
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to connect to OpenAI-compatible provider: {e}. "
+            "Check OPENAI_API_KEY and EMBEDDING_MODEL in your .env file."
+        )
 
     yield
     logger.info("Shutting down Agentic RAG Service...")

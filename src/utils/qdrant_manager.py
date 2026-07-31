@@ -38,13 +38,23 @@ class QdrantManager:
         Returns:
             None
         """
-        if not self.client.collection_exists(collection_name):
-            from qdrant_client.http.models import VectorParams
+        from qdrant_client.http.models import VectorParams
 
-            self.client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(size=vector_size, distance=distance),
+        if self.client.collection_exists(collection_name):
+            info = self.client.get_collection(collection_name)
+            existing_size = info.config.params.vectors.size  # type: ignore[union-attr]
+            if existing_size == vector_size:
+                return
+            raise ValueError(
+                f"Collection '{collection_name}' has vector size {existing_size}, "
+                f"but {vector_size} is required. Delete the collection manually "
+                "to recreate it with the new size."
             )
+
+        self.client.create_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=vector_size, distance=distance),
+        )
 
     async def upsert_points(
         self, collection_name: str, points: List[PointStruct]
@@ -107,7 +117,7 @@ class QdrantManager:
         # or the vector is passed. To follow node instructions literally,
         # we'll add 'query' to the signature and handle it.
 
-        target_query = query_vector
+        target_query: Optional[List[float]] | str = query_vector
         if query and not query_vector:
             # ponytail: In a real scenario, this would call an embedding model.
             # Since the node is told to just 'call search with query', we'll

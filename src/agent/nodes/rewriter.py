@@ -1,8 +1,8 @@
 from typing import Union
 
-from openai import OpenAI
 from src.schemas.agent_state import AgentState
 from src.config.settings import get_settings
+from src.utils.openai_client import get_openai_client
 
 
 async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dict]:
@@ -20,8 +20,7 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
     settings = get_settings()
 
     # Initialize OpenAI client
-    # ponytail: defaults to OPENAI_API_KEY from environment via settings
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_openai_client()
 
     if isinstance(state, dict):
         query = state.get("query", "")
@@ -36,8 +35,8 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
         "Rewritten Query:"
     )
 
-    response = client.chat.completions.create(
-        model=getattr(settings, "REWRITER_MODEL_NAME", "gpt-4o"),
+    response = await client.chat.completions.create(
+        model=settings.GENERATION_MODEL,
         messages=[
             {"role": "system", "content": "You are a query rewriting assistant."},
             {"role": "user", "content": prompt},

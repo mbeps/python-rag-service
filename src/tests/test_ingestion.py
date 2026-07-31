@@ -37,7 +37,7 @@ def test_partition_and_chunk():
             mock_partition.assert_called_once_with(
                 filename=str(mock_file_path),
                 pdf_infer_table_structure=True,
-                strategy="hi_res",
+                strategy="fast",
             )
             mock_chunk_title.assert_called_once()
             assert len(result) == 1
@@ -54,6 +54,7 @@ async def test_ingestion_service_full_flow():
     mock_settings.OPENAI_API_KEY = "test_key"
     mock_settings.OPENAI_BASE_URL = "test_url"
     mock_settings.EMBEDDING_MODEL = "test_model"
+    mock_settings.EMBEDDING_DIMENSIONS = 1536
 
     mock_qdrant = AsyncMock()
     mock_minio = MagicMock()
@@ -81,7 +82,7 @@ async def test_ingestion_service_full_flow():
     with (
         patch("src.ingestion.indexer.DocumentPartitioner") as MockPartitioner,
         patch("src.ingestion.indexer.AssetProcessor") as MockProcessor,
-        patch("src.ingestion.indexer.AsyncOpenAI") as MockOpenAI,
+        patch("src.utils.openai_client.AsyncOpenAI") as MockOpenAI,
     ):
         # Setup mocks
         MockPartitioner.return_value.partition_and_chunk.return_value = [mock_chunk]
@@ -112,7 +113,7 @@ async def test_ingestion_service_full_flow():
 
         # Verify OpenAI call
         mock_openai_instance.embeddings.create.assert_called_once_with(
-            input="chunk text", model="test_model"
+            input="chunk text", model="test_model", encoding_format="float"
         )
 
         _, kwargs = mock_qdrant.upsert_points.call_args
