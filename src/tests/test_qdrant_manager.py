@@ -1,9 +1,8 @@
 import pytest
-import httpx
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 from qdrant_client.http.models import PointStruct, Filter, FieldCondition, MatchValue
-from qdrant_client.http.exceptions import UnexpectedResponse
 from src.utils.qdrant_manager import QdrantManager
+
 
 @pytest.fixture
 def mock_async_qdrant_client():
@@ -18,22 +17,25 @@ def mock_async_qdrant_client():
     mock.close = AsyncMock()
     return mock
 
+
 @pytest.mark.asyncio
 async def test_qdrant_manager_initialization(mock_async_qdrant_client):
     """Test that QdrantManager initializes correctly."""
     manager = QdrantManager(client=mock_async_qdrant_client)
     assert manager.client == mock_async_qdrant_client
 
+
 @pytest.mark.asyncio
 async def test_ensure_collection_creates_if_not_exists(mock_async_qdrant_client):
     """Test that ensure_collection creates a collection if missing."""
     mock_async_qdrant_client.collection_exists.return_value = False
     manager = QdrantManager(client=mock_async_qdrant_client)
-    
+
     await manager.ensure_collection("test_col", vector_size=1536)
 
     mock_async_qdrant_client.collection_exists.assert_called_once_with("test_col")
     mock_async_qdrant_client.create_collection.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_ensure_collection_skips_if_exists(mock_async_qdrant_client):
@@ -49,6 +51,7 @@ async def test_ensure_collection_skips_if_exists(mock_async_qdrant_client):
     mock_async_qdrant_client.collection_exists.assert_called_once_with("test_col")
     mock_async_qdrant_client.create_collection.assert_not_called()
 
+
 @pytest.mark.asyncio
 async def test_upsert_points(mock_async_qdrant_client):
     """Test that upsert_points calls the client with expected arguments."""
@@ -60,6 +63,7 @@ async def test_upsert_points(mock_async_qdrant_client):
     mock_async_qdrant_client.upsert.assert_called_once_with(
         collection_name="test_col", points=points
     )
+
 
 @pytest.mark.asyncio
 async def test_search_with_kb_id_filter(mock_async_qdrant_client):
