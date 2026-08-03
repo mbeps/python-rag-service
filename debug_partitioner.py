@@ -3,7 +3,12 @@ from pathlib import Path
 from src.ingestion.partitioner import DocumentPartitioner
 
 
-def test_partitioner(file_path: str):
+def run_partitioner_debug(file_path: str) -> None:
+    """Debug utility to test document partitioner on a single file.
+
+    Args:
+        file_path: Path to the file to partition
+    """
     path = Path(file_path)
     if not path.exists():
         print(f"File {file_path} does not exist.")
@@ -24,4 +29,4 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python debug_partitioner.py <file_path>")
     else:
-        test_partitioner(sys.argv[1])
+        run_partitioner_debug(sys.argv[1])
