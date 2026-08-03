@@ -22,4 +22,6 @@ class ProcessedChunk(BaseModel):
     )
     kb_id: str = Field(..., description="The ID of the knowledge base.")
     document_id: str = Field(..., description="Stable identifier for the document.")
-    chunk_id: str = Field(..., description="Deterministic unique identifier for the chunk.")
+    chunk_id: str = Field(
+        ..., description="Deterministic unique identifier for the chunk."
+    )

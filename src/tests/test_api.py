@@ -5,6 +5,7 @@ from io import BytesIO
 
 from src.main import app
 
+
 @pytest.fixture
 def client():
     """Test client that handles lifespan events."""

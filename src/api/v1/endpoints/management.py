@@ -63,7 +63,9 @@ async def delete_knowledge_base(
     )
 
     # 2. Delete MinIO folder
-    await minio.delete_folder(bucket_name=settings.MINIO_VISUAL_BUCKET, prefix=f"{kb_id}/")
+    await minio.delete_folder(
+        bucket_name=settings.MINIO_VISUAL_BUCKET, prefix=f"{kb_id}/"
+    )
 
     return Response(status_code=204)
 
@@ -78,7 +80,7 @@ async def delete_document(
     """
     Surgically remove a document from a Knowledge Base.
     """
-    # We don't check existence separately for performance, 
+    # We don't check existence separately for performance,
     # delete_points_by_filter will just not delete anything if not found.
     # However, we might want to check if the KB exists.
     kb = await qdrant.get_kb_metadata(settings.KB_REGISTRY_COLLECTION, kb_id)

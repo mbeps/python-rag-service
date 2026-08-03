@@ -26,8 +26,8 @@ class DocumentPartitioner:
         # ponytail: skip_infer_table_types is used to avoid deprecated pdf_infer_table_structure warning.
         elements = partition(
             filename=str(file_path),
-            skip_infer_table_types=[], # Ensures table inference if desired for PDFs
-            strategy="fast"
+            skip_infer_table_types=[],  # Ensures table inference if desired for PDFs
+            strategy="fast",
         )
 
         # Chunk elements by title to preserve semantic structure

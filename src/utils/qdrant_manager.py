@@ -1,8 +1,17 @@
 from typing import Optional, List
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.http.models import Distance, PointStruct, ScoredPoint, VectorParams, Filter, FieldCondition, MatchValue
+from qdrant_client.http.models import (
+    Distance,
+    PointStruct,
+    ScoredPoint,
+    VectorParams,
+    Filter,
+    FieldCondition,
+    MatchValue,
+)
 from qdrant_client.http.exceptions import UnexpectedResponse
 import asyncio
+
 
 class QdrantManager:
     """
@@ -122,7 +131,9 @@ class QdrantManager:
             return result[0].payload
         return None
 
-    async def delete_points_by_filter(self, collection_name: str, kb_id: str, document_id: str) -> None:
+    async def delete_points_by_filter(
+        self, collection_name: str, kb_id: str, document_id: str
+    ) -> None:
         """
         Deletes points in a collection matching kb_id and document_id.
         """
@@ -131,12 +142,16 @@ class QdrantManager:
             points_selector=Filter(
                 must=[
                     FieldCondition(key="kb_id", match=MatchValue(value=kb_id)),
-                    FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+                    FieldCondition(
+                        key="document_id", match=MatchValue(value=document_id)
+                    ),
                 ]
             ),
         )
 
-    async def delete_kb(self, collection_name: str, registry_collection: str, kb_id: str) -> None:
+    async def delete_kb(
+        self, collection_name: str, registry_collection: str, kb_id: str
+    ) -> None:
         """
         Deletes all points for a KB and its registry entry.
         """

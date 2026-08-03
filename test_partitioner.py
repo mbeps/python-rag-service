@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from src.ingestion.partitioner import DocumentPartitioner
 
+
 def test_partitioner(file_path: str):
     path = Path(file_path)
     if not path.exists():
@@ -17,6 +18,7 @@ def test_partitioner(file_path: str):
         print(f"  Type: {type(chunk)}")
         print(f"  Text: {chunk.text[:100]}...")
         print(f"  Metadata: {chunk.metadata.to_dict()}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

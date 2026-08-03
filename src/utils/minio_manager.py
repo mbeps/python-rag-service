@@ -114,7 +114,9 @@ class MinIOManager:
         try:
             # list_objects is a generator, we need to collect it in the thread
             def get_objects():
-                return list(self.client.list_objects(bucket_name, prefix=prefix, recursive=True))
+                return list(
+                    self.client.list_objects(bucket_name, prefix=prefix, recursive=True)
+                )
 
             objects = await asyncio.to_thread(get_objects)
             if not objects:
@@ -122,12 +124,13 @@ class MinIOManager:
 
             # remove_objects expects an iterator of delete objects
             from minio.deleteobjects import DeleteObject
+
             delete_list = [
-                DeleteObject(obj.object_name) 
-                for obj in objects 
+                DeleteObject(obj.object_name)
+                for obj in objects
                 if obj.object_name is not None
             ]
-            
+
             if not delete_list:
                 return
 

@@ -25,7 +25,9 @@ def decide_next_step(state: AgentState) -> Literal["generator", "rewriter", "gen
         # ponytail: cap iterations at 3 to prevent infinite loops.
         return "generate"
 
-    grader_feedback = state["grader_feedback"] if isinstance(state, dict) else state.grader_feedback
+    grader_feedback = (
+        state["grader_feedback"] if isinstance(state, dict) else state.grader_feedback
+    )
     if grader_feedback == "relevant":
         return "generator"
     return "rewriter"

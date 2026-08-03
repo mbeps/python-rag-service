@@ -5,13 +5,15 @@ from src.schemas.agent_state import AgentState
 from src.utils.openai_client import get_openai_client
 from src.utils.qdrant_manager import QdrantManager
 
+
 def get_qdrant_client() -> AsyncQdrantClient:
     """Creates a temporary async client for the node."""
     return AsyncQdrantClient(
         host=settings.QDRANT_HOST,
         port=settings.QDRANT_PORT,
-        api_key=settings.QDRANT_API_KEY
+        api_key=settings.QDRANT_API_KEY,
     )
+
 
 def _sanitise_document(
     payload: dict[str, object],
@@ -29,10 +31,11 @@ def _sanitise_document(
         doc["image_url"] = image_url
     return doc
 
+
 async def retriever_node(state: AgentState) -> AgentState:
     """Retrieves relevant documents from the knowledge base."""
     settings = get_settings()
-    
+
     # ponytail: The node currently creates its own client; in production,
     # this should be passed in via RunnableConfig if possible.
     client = get_qdrant_client()

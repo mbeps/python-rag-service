@@ -123,7 +123,7 @@ class IngestionService:
         for i, chunk in enumerate(processed_chunks):
             # Generate deterministic chunk ID
             chunk_id = str(uuid.uuid5(uuid.UUID(hex=document_id[:32]), str(i)))
-            
+
             # Generate embedding using OpenAI-compatible API
             response = await self.openai_client.embeddings.create(
                 input=chunk.text,
@@ -142,9 +142,7 @@ class IngestionService:
                 **chunk.metadata,
             }
 
-            points.append(
-                PointStruct(id=chunk_id, vector=vector, payload=payload)
-            )
+            points.append(PointStruct(id=chunk_id, vector=vector, payload=payload))
 
         # 4. Batch Upsert to Qdrant
         if points:
