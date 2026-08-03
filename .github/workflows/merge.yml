@@ -5,6 +5,27 @@ on:
     branches:
       - master
 
+env:
+  # OpenAI-compatible API configuration
+  OPENAI_BASE_URL: https://openrouter.ai/api/v1
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  GENERATION_MODEL: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+  EMBEDDING_MODEL: nvidia/nemotron-3-embed-1b:free
+  EMBEDDING_DIMENSIONS: "2048"
+  
+  # Knowledge base matching threshold
+  DYNAMIC_KB_THRESHOLD: "0.65"
+  
+  # Qdrant configuration (matches docker-compose service names)
+  QDRANT_HOST: localhost
+  QDRANT_PORT: "6333"
+  
+  # MinIO configuration (matches docker-compose service names)
+  MINIO_ENDPOINT: localhost:9000
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_VISUAL_BUCKET: rag-assets
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -33,6 +54,40 @@ jobs:
       - name: Pyrefly Architecture Check
         run: uv run pyrefly check
       
+      - name: Create .env from workflow environment
+        run: |
+          # Validate required secrets
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "Error: OPENAI_API_KEY secret is not set"
+            exit 1
+          fi
+          
+          # Create .env from environment variables
+          {
+            echo "# CI/CD Environment Configuration"
+            echo "# Auto-generated from GitHub Actions workflow environment"
+            echo ""
+            echo "# OpenAI-compatible API configuration"
+            echo "OPENAI_BASE_URL=${{ env.OPENAI_BASE_URL }}"
+            echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}"
+            echo "GENERATION_MODEL=${{ env.GENERATION_MODEL }}"
+            echo "EMBEDDING_MODEL=${{ env.EMBEDDING_MODEL }}"
+            echo "EMBEDDING_DIMENSIONS=${{ env.EMBEDDING_DIMENSIONS }}"
+            echo ""
+            echo "# Knowledge base matching threshold"
+            echo "DYNAMIC_KB_THRESHOLD=${{ env.DYNAMIC_KB_THRESHOLD }}"
+            echo ""
+            echo "# Qdrant configuration"
+            echo "QDRANT_HOST=${{ env.QDRANT_HOST }}"
+            echo "QDRANT_PORT=${{ env.QDRANT_PORT }}"
+            echo ""
+            echo "# MinIO configuration"
+            echo "MINIO_ENDPOINT=${{ env.MINIO_ENDPOINT }}"
+            echo "MINIO_ACCESS_KEY=${{ env.MINIO_ACCESS_KEY }}"
+            echo "MINIO_SECRET_KEY=${{ env.MINIO_SECRET_KEY }}"
+            echo "MINIO_VISUAL_BUCKET=${{ env.MINIO_VISUAL_BUCKET }}"
+          } > .env
+      
       - name: Start Docker Compose services
         run: docker compose up -d
       
@@ -54,11 +109,6 @@ jobs:
         
       - name: Run Test Suite
         run: uv run pytest
-        env:
-          QDRANT_HOST: localhost
-          MINIO_ENDPOINT: localhost:9000
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
       
       - name: Stop Docker Compose services
         if: always()
