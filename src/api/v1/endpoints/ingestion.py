@@ -7,30 +7,10 @@ from typing import List
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, Depends
 from starlette.status import HTTP_202_ACCEPTED
 
-from src.config.settings import Settings, get_settings
 from src.ingestion.indexer import IngestionService
-from src.utils.minio_manager import MinIOManager
-from src.utils.qdrant_manager import QdrantManager
+from src.api.v1.dependencies import get_ingestion_service
 
 router = APIRouter()
-
-
-def get_ingestion_service(
-    settings: Settings = Depends(get_settings),
-) -> IngestionService:
-    """Dependency injection for IngestionService."""
-    qdrant_manager = QdrantManager(
-        host=settings.QDRANT_HOST,
-        port=settings.QDRANT_PORT,
-        api_key=settings.QDRANT_API_KEY,
-    )
-    minio_manager = MinIOManager(
-        endpoint=settings.MINIO_ENDPOINT,
-        access_key=settings.MINIO_ACCESS_KEY,
-        secret_key=settings.MINIO_SECRET_KEY,
-        secure=settings.MINIO_SECURE,
-    )
-    return IngestionService(settings, qdrant_manager, minio_manager)
 
 
 async def run_ingestion(service: IngestionService, tmp_dir: str, kb_id: str):
@@ -64,14 +44,45 @@ async def ingest_documents(
     # 1. Register KB metadata (upsert to kb_registry)
     await service.register_kb(kb_id, kb_name, kb_description)
 
-    # 2. Save files to temporary directory
+    # 2. Security validation & Save files to temporary directory
     tmp_dir = tempfile.mkdtemp()
-    for file in files:
-        if not file.filename:
-            continue
-        file_path = Path(tmp_dir) / file.filename
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    try:
+        from src.config.settings import settings
+        from fastapi import HTTPException
+        from starlette.status import (
+            HTTP_413_CONTENT_TOO_LARGE,
+            HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        )
+
+        for file in files:
+            if not file.filename:
+                continue
+
+            # Ingestion Security: Extension Check
+            extension = Path(file.filename).suffix.lstrip(".").lower()
+            if extension not in settings.ALLOWED_EXTENSIONS:
+                raise HTTPException(
+                    status_code=HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail=f"File extension '{extension}' is not allowed. Allowed: {settings.ALLOWED_EXTENSIONS}",
+                )
+
+            # Ingestion Security: File Size Check
+            # Note: file.size is available since FastAPI 0.99.0
+            max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+            if file.size and file.size > max_size_bytes:
+                raise HTTPException(
+                    status_code=HTTP_413_CONTENT_TOO_LARGE,
+                    detail=f"File '{file.filename}' exceeds maximum size of {settings.MAX_UPLOAD_SIZE_MB}MB.",
+                )
+
+            # ponytail: prevent path traversal by taking only the filename
+            safe_filename = Path(file.filename).name
+            file_path = Path(tmp_dir) / safe_filename
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        shutil.rmtree(tmp_dir)
+        raise e
 
     # 3. Trigger background processing
     job_id = str(uuid.uuid4())

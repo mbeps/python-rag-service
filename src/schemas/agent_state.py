@@ -36,3 +36,4 @@ class AgentState(BaseModel):
     citations: List[Dict[str, Union[str, int, float]]] = Field(
         default_factory=list, description="Source indices and page numbers"
     )
+    loop_step: int = Field(default=0, description="Counter for rewrite iterations")

@@ -5,31 +5,32 @@ from io import BytesIO
 
 from src.main import app
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    """Test client that handles lifespan events."""
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture
 def mock_indexer():
     """Mock the IngestionService methods."""
     with (
-        patch("src.api.v1.endpoints.ingestion.IngestionService.ingest") as mock_ingest,
-        patch(
-            "src.api.v1.endpoints.ingestion.IngestionService.register_kb"
-        ) as mock_reg,
+        patch("src.api.v1.dependencies.IngestionService") as mock_ingest_class,
     ):
-        yield mock_ingest, mock_reg
+        mock_instance = mock_ingest_class.return_value
+        mock_instance.ingest = AsyncMock()
+        mock_instance.register_kb = AsyncMock()
+        yield mock_instance.ingest, mock_instance.register_kb
 
 
 @pytest.fixture
 def mock_qdrant_manager():
     """Mock QdrantManager for KB registry operations."""
     with (
-        patch("src.api.v1.endpoints.ingestion.QdrantManager") as mock_ingest_class,
-        patch("src.api.v1.endpoints.query.QdrantManager") as mock_query_class,
+        patch("src.api.v1.dependencies.QdrantManager") as mock_manager_class,
     ):
-        mock_instance = mock_ingest_class.return_value
-        # Ensure both patches use the same mock instance
-        mock_query_class.return_value = mock_instance
+        mock_instance = mock_manager_class.return_value
         mock_instance.ensure_collection = AsyncMock()
         mock_instance.upsert_points = AsyncMock()
         mock_instance.search = AsyncMock()
@@ -44,14 +45,14 @@ def mock_agent_app():
         yield mock
 
 
-def test_health_check():
+def test_health_check(client):
     """Test the health check endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_ingest_documents_success(mock_indexer, mock_qdrant_manager):
+def test_ingest_documents_success(client, mock_indexer, mock_qdrant_manager):
     """Test successful document ingestion trigger."""
     mock_ingest, mock_reg = mock_indexer
     files = [
@@ -78,7 +79,7 @@ def test_ingest_documents_success(mock_indexer, mock_qdrant_manager):
     mock_reg.assert_called_once()
 
 
-def test_ingest_documents_missing_files():
+def test_ingest_documents_missing_files(client):
     """Test ingestion fails when no files are provided."""
     data = {"kb_id": "test_kb", "kb_name": "Test KB", "kb_description": "Desc"}
     response = client.post("/api/v1/ingest", data=data)
@@ -86,7 +87,7 @@ def test_ingest_documents_missing_files():
     assert response.status_code == 422
 
 
-def test_query_explicit_kb_success(mock_agent_app):
+def test_query_explicit_kb_success(client, mock_agent_app):
     """Test query with an explicit kb_id."""
     mock_agent_app.ainvoke.return_value = {
         "answer": "The answer is 42.",
@@ -110,7 +111,7 @@ def test_query_explicit_kb_success(mock_agent_app):
     mock_agent_app.ainvoke.assert_called_once()
 
 
-def test_query_dynamic_kb_selection(mock_agent_app, mock_qdrant_manager):
+def test_query_dynamic_kb_selection(client, mock_agent_app, mock_qdrant_manager):
     """Test that query performs dynamic KB selection when kb_id is missing."""
     # Mock Qdrant search to return a matching KB
     mock_match = MagicMock()
@@ -139,7 +140,7 @@ def test_query_dynamic_kb_selection(mock_agent_app, mock_qdrant_manager):
     mock_agent_app.ainvoke.assert_called_once()
 
 
-def test_query_dynamic_kb_no_match(mock_qdrant_manager):
+def test_query_dynamic_kb_no_match(client, mock_qdrant_manager):
     """Test dynamic selection when no KB matches the threshold."""
     # Mock Qdrant search to return low score matches
     mock_match = MagicMock()
@@ -158,7 +159,7 @@ def test_query_dynamic_kb_no_match(mock_qdrant_manager):
     assert "No relevant Knowledge Base found" in response.json()["detail"]
 
 
-def test_query_invalid_schema():
+def test_query_invalid_schema(client):
     """Test query fails with invalid request body."""
     response = client.post("/api/v1/query", json={})  # Missing "query"
     assert response.status_code == 422

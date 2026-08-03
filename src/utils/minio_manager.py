@@ -100,6 +100,50 @@ class MinIOManager:
         except S3Error as e:
             raise e
 
+    async def delete_folder(self, bucket_name: str, prefix: str) -> None:
+        """
+        Deletes all objects with a specific prefix (simulating folder deletion).
+
+        Args:
+            bucket_name: The name of the bucket.
+            prefix: The prefix of objects to delete.
+
+        Returns:
+            None
+        """
+        try:
+            # list_objects is a generator, we need to collect it in the thread
+            def get_objects():
+                return list(self.client.list_objects(bucket_name, prefix=prefix, recursive=True))
+
+            objects = await asyncio.to_thread(get_objects)
+            if not objects:
+                return
+
+            # remove_objects expects an iterator of delete objects
+            from minio.deleteobjects import DeleteObject
+            delete_list = [
+                DeleteObject(obj.object_name) 
+                for obj in objects 
+                if obj.object_name is not None
+            ]
+            
+            if not delete_list:
+                return
+
+            def remove_all():
+                errors = self.client.remove_objects(bucket_name, delete_list)
+                # We must consume the errors generator for it to actually delete
+                return list(errors)
+
+            errors = await asyncio.to_thread(remove_all)
+            if errors:
+                # Log or handle errors if necessary
+                pass
+
+        except S3Error as e:
+            raise e
+
     async def get_presigned_url(
         self, bucket_name: str, object_name: str, expires_in: int = 3600
     ) -> str:

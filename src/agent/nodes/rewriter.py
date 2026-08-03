@@ -23,15 +23,17 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
     client = get_openai_client()
 
     if isinstance(state, dict):
-        query = state.get("query", "")
+        query = state.get("rewritten_query") or state.get("query") or ""
+        loop_step = state.get("loop_step", 0)
     else:
-        query = state.query
+        query = state.rewritten_query or state.query
+        loop_step = state.loop_step
 
     prompt = (
         "You are a search query optimizer. Your goal is to rewrite the user's "
         "query into a concise, keyword-rich search term that will return the "
         "most relevant documents from a vector database.\n\n"
-        f"Original Query: {query}\n\n"
+        f"Query context: {query}\n\n"
         "Rewritten Query:"
     )
 
@@ -49,7 +51,9 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
 
     if isinstance(state, dict):
         state["rewritten_query"] = rewritten_query
+        state["loop_step"] = loop_step + 1
     else:
         state.rewritten_query = rewritten_query
+        state.loop_step = loop_step + 1
 
     return state

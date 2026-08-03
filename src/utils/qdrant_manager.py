@@ -1,26 +1,22 @@
 from typing import Optional, List
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, PointStruct, ScoredPoint
-
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.models import Distance, PointStruct, ScoredPoint, VectorParams, Filter, FieldCondition, MatchValue
+from qdrant_client.http.exceptions import UnexpectedResponse
+import asyncio
 
 class QdrantManager:
     """
-    Manager for Qdrant vector database operations.
+    Manager for Qdrant vector database operations using AsyncQdrantClient.
     """
 
-    def __init__(self, host: str, port: int, api_key: Optional[str] = None):
+    def __init__(self, client: AsyncQdrantClient):
         """
-        Initializes the Qdrant client.
+        Initializes the Qdrant manager with an existing async client.
 
         Args:
-            host: Qdrant server host.
-            port: Qdrant server port.
-            api_key: Optional API key for authentication.
-
-        Returns:
-            None
+            client: An instance of AsyncQdrantClient.
         """
-        self.client: QdrantClient = QdrantClient(host=host, port=port, api_key=api_key)
+        self.client: AsyncQdrantClient = client
 
     async def ensure_collection(
         self,
@@ -30,28 +26,18 @@ class QdrantManager:
     ) -> None:
         """
         Ensures the collection exists in Qdrant.
-
-        Args:
-            collection_name: Name of the collection.
-            vector_size: Size of vectors.
-
-        Returns:
-            None
         """
-        from qdrant_client.http.models import VectorParams
-
-        if self.client.collection_exists(collection_name):
-            info = self.client.get_collection(collection_name)
+        if await self.client.collection_exists(collection_name):
+            info = await self.client.get_collection(collection_name)
             existing_size = info.config.params.vectors.size  # type: ignore[union-attr]
             if existing_size == vector_size:
                 return
             raise ValueError(
                 f"Collection '{collection_name}' has vector size {existing_size}, "
-                f"but {vector_size} is required. Delete the collection manually "
-                "to recreate it with the new size."
+                f"but {vector_size} is required."
             )
 
-        self.client.create_collection(
+        await self.client.create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(size=vector_size, distance=distance),
         )
@@ -61,26 +47,15 @@ class QdrantManager:
     ) -> None:
         """
         Upserts points to a collection with retries on transient errors.
-
-        Args:
-            collection_name: Name of the collection.
-            points: List of points to upsert.
-
-        Returns:
-            None
         """
-        import asyncio
-        from qdrant_client.http.exceptions import UnexpectedResponse
-
         max_retries = 3
-        retry_delay = 0.1  # Small delay for tests
+        retry_delay = 0.1
 
         for attempt in range(max_retries):
             try:
-                self.client.upsert(collection_name=collection_name, points=points)
+                await self.client.upsert(collection_name=collection_name, points=points)
                 return
             except UnexpectedResponse as e:
-                # Retry on 5xx errors
                 if (
                     isinstance(e.status_code, int)
                     and e.status_code >= 500
@@ -100,80 +75,40 @@ class QdrantManager:
     ) -> List[ScoredPoint]:
         """
         Performs similarity search, optionally filtered by kb_id.
-        One of query_vector or query (string) must be provided.
-
-        Args:
-            collection_name: Name of the collection.
-            query_vector: Optional query vector.
-            query: Optional query string. If provided, requires embedding logic.
-            limit: Maximum number of results to return.
-            kb_id: Optional knowledge base ID to filter by.
-
-        Returns:
-            List of ScoredPoint results.
         """
-        # If query string provided but no vector, we might need a way to embed it.
-        # However, for the node implementation, we'll assume search handles it
-        # or the vector is passed. To follow node instructions literally,
-        # we'll add 'query' to the signature and handle it.
-
-        target_query: Optional[List[float]] | str = query_vector
-        if query and not query_vector:
-            # ponytail: In a real scenario, this would call an embedding model.
-            # Since the node is told to just 'call search with query', we'll
-            # assume the client supports a string-based query if configured,
-            # but Qdrant query_points 'query' arg can take a vector or a
-            # NamedVector. For now, we'll just use 'query' as passed.
-            target_query = query
+        target_query = query_vector if query_vector else query
 
         query_filter = None
         if kb_id:
-            from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-
             query_filter = Filter(
                 must=[FieldCondition(key="kb_id", match=MatchValue(value=kb_id))]
             )
 
-        return self.client.query_points(
+        result = await self.client.query_points(
             collection_name=collection_name,
             query=target_query,
             query_filter=query_filter,
             limit=limit,
-        ).points
+        )
+        return result.points
 
     async def list_kbs(self, collection_name: str) -> List[dict]:
         """
         Lists all Knowledge Bases in the registry.
-
-        Args:
-            collection_name: Name of the registry collection.
-
-        Returns:
-            List of metadata payloads.
         """
-        # scroll to get all points
-        result, _ = self.client.scroll(
+        result, _ = await self.client.scroll(
             collection_name=collection_name,
             with_payload=True,
             with_vectors=False,
-            limit=100,  # ponytail: Defaulting to 100 for now.
+            limit=100,
         )
         return [point.payload for point in result if point.payload] if result else []
 
     async def get_kb_metadata(self, collection_name: str, kb_id: str) -> Optional[dict]:
         """
         Retrieves metadata for a specific Knowledge Base.
-
-        Args:
-            collection_name: Name of the registry collection.
-            kb_id: Knowledge Base identifier.
-
-        Returns:
-            Metadata payload or None if not found.
         """
-        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-
-        result, _ = self.client.scroll(
+        result, _ = await self.client.scroll(
             collection_name=collection_name,
             scroll_filter=Filter(
                 must=[FieldCondition(key="kb_id", match=MatchValue(value=kb_id))]
@@ -186,3 +121,37 @@ class QdrantManager:
         if result and result[0].payload:
             return result[0].payload
         return None
+
+    async def delete_points_by_filter(self, collection_name: str, kb_id: str, document_id: str) -> None:
+        """
+        Deletes points in a collection matching kb_id and document_id.
+        """
+        await self.client.delete(
+            collection_name=collection_name,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(key="kb_id", match=MatchValue(value=kb_id)),
+                    FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+                ]
+            ),
+        )
+
+    async def delete_kb(self, collection_name: str, registry_collection: str, kb_id: str) -> None:
+        """
+        Deletes all points for a KB and its registry entry.
+        """
+        # Delete points in knowledge base collection
+        await self.client.delete(
+            collection_name=collection_name,
+            points_selector=Filter(
+                must=[FieldCondition(key="kb_id", match=MatchValue(value=kb_id))]
+            ),
+        )
+
+        # Delete registry entry
+        await self.client.delete(
+            collection_name=registry_collection,
+            points_selector=Filter(
+                must=[FieldCondition(key="kb_id", match=MatchValue(value=kb_id))]
+            ),
+        )

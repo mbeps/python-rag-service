@@ -25,7 +25,7 @@ def test_partition_and_chunk():
     mock_chunks = [mock_chunk]
 
     with patch(
-        "src.ingestion.partitioner.partition_pdf", return_value=mock_elements
+        "src.ingestion.partitioner.partition", return_value=mock_elements
     ) as mock_partition:
         with patch(
             "src.ingestion.partitioner.chunk_by_title", return_value=mock_chunks
@@ -36,7 +36,7 @@ def test_partition_and_chunk():
             # Assert
             mock_partition.assert_called_once_with(
                 filename=str(mock_file_path),
-                pdf_infer_table_structure=True,
+                skip_infer_table_types=[],
                 strategy="fast",
             )
             mock_chunk_title.assert_called_once()
@@ -61,6 +61,9 @@ async def test_ingestion_service_full_flow():
     kb_id = "test_kb"
     file_path = Path("/tmp/test.pdf")
 
+    # Mock file system to avoid needing a real file
+    mock_file_content = b"dummy pdf content"
+
     # Mock chunks
     mock_chunk = MagicMock()
     mock_chunk.text = "chunk text"
@@ -71,6 +74,8 @@ async def test_ingestion_service_full_flow():
         image_url="http://test.com/img.png",
         metadata={"page": 1},
         kb_id=kb_id,
+        document_id="test_doc",
+        chunk_id="test_chunk",
     )
 
     # Mock response from OpenAI
@@ -83,6 +88,7 @@ async def test_ingestion_service_full_flow():
         patch("src.ingestion.indexer.DocumentPartitioner") as MockPartitioner,
         patch("src.ingestion.indexer.AssetProcessor") as MockProcessor,
         patch("src.utils.openai_client.AsyncOpenAI") as MockOpenAI,
+        patch("pathlib.Path.read_bytes", return_value=mock_file_content),
     ):
         # Setup mocks
         MockPartitioner.return_value.partition_and_chunk.return_value = [mock_chunk]

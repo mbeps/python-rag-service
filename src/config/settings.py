@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     BACKEND_CORS_ORIGINS: list[str] = ["*"]
 
+    # Ingestion Security
+    MAX_UPLOAD_SIZE_MB: int = 10
+    ALLOWED_EXTENSIONS: list[str] = ["pdf", "txt", "md", "docx"]
+
     # OpenAI-Compatible Provider Settings
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
@@ -27,12 +31,14 @@ class Settings(BaseSettings):
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
     QDRANT_API_KEY: Optional[str] = None
+    QDRANT_COLLECTION: str = "knowledge_base"
 
     # MinIO Settings
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_SECURE: bool = False
+    MINIO_VISUAL_BUCKET: str = "visual-assets"
 
     # Knowledge Base Selection Settings
     KB_REGISTRY_COLLECTION: str = "kb_registry"
