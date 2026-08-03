@@ -15,8 +15,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Runtime stage
 FROM python:3.12-slim-bookworm
 
-# Copy uv from the official image
-COPY --from=ghcr.io/astral-sh/uv:latest /usr/bin/uv /usr/bin/uv
+# Copy uv from the builder stage
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 
 WORKDIR /app
 

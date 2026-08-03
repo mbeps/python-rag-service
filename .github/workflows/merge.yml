@@ -9,29 +9,30 @@ env:
   # OpenAI-compatible API configuration
   OPENAI_BASE_URL: https://openrouter.ai/api/v1
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  GENERATION_MODEL: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
-  EMBEDDING_MODEL: nvidia/nemotron-3-embed-1b:free
-  EMBEDDING_DIMENSIONS: "2048"
+  GENERATION_MODEL: ${{ secrets.GENERATION_MODEL }}
+  EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+  EMBEDDING_DIMENSIONS: ${{ secrets.EMBEDDING_DIMENSIONS }}
   
   # Knowledge base matching threshold
-  DYNAMIC_KB_THRESHOLD: "0.65"
+  DYNAMIC_KB_THRESHOLD: ${{ secrets.EB_MATCH_THRESHOLD }}
   
-  # Qdrant configuration (matches docker-compose service names)
-  QDRANT_HOST: localhost
-  QDRANT_PORT: "6333"
+  # Qdrant configuration
+  QDRANT_HOST: ${{ secrets.QDRANT_HOST }}
+  QDRANT_PORT: ${{ secrets.QDRANT_PORT }}
   
-  # MinIO configuration (matches docker-compose service names)
-  MINIO_ENDPOINT: localhost:9000
-  MINIO_ACCESS_KEY: minioadmin
-  MINIO_SECRET_KEY: minioadmin
-  MINIO_VISUAL_BUCKET: rag-assets
+  # MinIO configuration
+  MINIO_ENDPOINT: ${{ secrets.MINIO_ENDPOINT }}
+  MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+  MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+  MINIO_VISUAL_BUCKET: ${{ secrets.MINIO_BUCKET }}
 
 jobs:
-  validate:
+  lint:
+    name: Ruff Lint & Format Check
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       
       - name: Install uv
         uses: astral-sh/setup-uv@v3
@@ -47,12 +48,61 @@ jobs:
         
       - name: Ruff Format Check
         run: uv run ruff format --check .
+
+  type:
+    name: MyPy Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          
+      - name: Install dependencies
+        run: uv sync --dev
         
       - name: MyPy Type Check
         run: uv run mypy .
+
+  pyrefly:
+    name: Pyrefly Language Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          
+      - name: Install dependencies
+        run: uv sync --dev
         
-      - name: Pyrefly Architecture Check
+      - name: Pyrefly Language Check
         run: uv run pyrefly check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [lint, type, pyrefly]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          
+      - name: Install dependencies
+        run: uv sync --dev
       
       - name: Create .env from workflow environment
         run: |
@@ -70,46 +120,24 @@ jobs:
             echo "# OpenAI-compatible API configuration"
             echo "OPENAI_BASE_URL=${{ env.OPENAI_BASE_URL }}"
             echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}"
-            echo "GENERATION_MODEL=${{ env.GENERATION_MODEL }}"
-            echo "EMBEDDING_MODEL=${{ env.EMBEDDING_MODEL }}"
-            echo "EMBEDDING_DIMENSIONS=${{ env.EMBEDDING_DIMENSIONS }}"
+            if [ -n "${{ env.GENERATION_MODEL }}" ]; then echo "GENERATION_MODEL=${{ env.GENERATION_MODEL }}"; fi
+            if [ -n "${{ env.EMBEDDING_MODEL }}" ]; then echo "EMBEDDING_MODEL=${{ env.EMBEDDING_MODEL }}"; fi
+            if [ -n "${{ env.EMBEDDING_DIMENSIONS }}" ]; then echo "EMBEDDING_DIMENSIONS=${{ env.EMBEDDING_DIMENSIONS }}"; fi
             echo ""
             echo "# Knowledge base matching threshold"
-            echo "DYNAMIC_KB_THRESHOLD=${{ env.DYNAMIC_KB_THRESHOLD }}"
+            if [ -n "${{ env.DYNAMIC_KB_THRESHOLD }}" ]; then echo "DYNAMIC_KB_THRESHOLD=${{ env.DYNAMIC_KB_THRESHOLD }}"; fi
             echo ""
             echo "# Qdrant configuration"
-            echo "QDRANT_HOST=${{ env.QDRANT_HOST }}"
-            echo "QDRANT_PORT=${{ env.QDRANT_PORT }}"
+            if [ -n "${{ env.QDRANT_HOST }}" ]; then echo "QDRANT_HOST=${{ env.QDRANT_HOST }}"; fi
+            if [ -n "${{ env.QDRANT_PORT }}" ]; then echo "QDRANT_PORT=${{ env.QDRANT_PORT }}"; fi
             echo ""
             echo "# MinIO configuration"
-            echo "MINIO_ENDPOINT=${{ env.MINIO_ENDPOINT }}"
-            echo "MINIO_ACCESS_KEY=${{ env.MINIO_ACCESS_KEY }}"
-            echo "MINIO_SECRET_KEY=${{ env.MINIO_SECRET_KEY }}"
-            echo "MINIO_VISUAL_BUCKET=${{ env.MINIO_VISUAL_BUCKET }}"
+            if [ -n "${{ env.MINIO_ENDPOINT }}" ]; then echo "MINIO_ENDPOINT=${{ env.MINIO_ENDPOINT }}"; fi
+            if [ -n "${{ env.MINIO_ACCESS_KEY }}" ]; then echo "MINIO_ACCESS_KEY=${{ env.MINIO_ACCESS_KEY }}"; fi
+            if [ -n "${{ env.MINIO_SECRET_KEY }}" ]; then echo "MINIO_SECRET_KEY=${{ env.MINIO_SECRET_KEY }}"; fi
+            if [ -n "${{ env.MINIO_VISUAL_BUCKET }}" ]; then echo "MINIO_VISUAL_BUCKET=${{ env.MINIO_VISUAL_BUCKET }}"; fi
           } > .env
-      
-      - name: Start Docker Compose services
-        run: docker compose up -d
-      
-      - name: Wait for services to be healthy
-        run: |
-          # Wait for Qdrant to be healthy
-          for i in {1..30}; do
-            curl -f http://localhost:6333/healthz && echo "Qdrant is healthy" && break
-            echo "Waiting for Qdrant... ($i/30)"
-            sleep 1
-          done
-          
-          # Wait for MinIO to be healthy
-          for i in {1..30}; do
-            curl -f http://localhost:9000/minio/health/live && echo "MinIO is healthy" && break
-            echo "Waiting for MinIO... ($i/30)"
-            sleep 1
-          done
-        
+              
       - name: Run Test Suite
         run: uv run pytest
       
-      - name: Stop Docker Compose services
-        if: always()
-        run: docker compose down -v
