@@ -1,11 +1,9 @@
-from typing import Union
-
 from src.schemas.agent_state import AgentState
 from src.config.settings import get_settings
 from src.utils.openai_client import get_openai_client
 
 
-async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dict]:
+async def rewriter_node(state: AgentState) -> AgentState:
     """Reformulates the user query to better match document search patterns.
 
     This node uses an LLM to rewrite the query into a form more conducive
