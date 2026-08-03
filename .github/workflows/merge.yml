@@ -9,22 +9,22 @@ env:
   # OpenAI-compatible API configuration
   OPENAI_BASE_URL: https://openrouter.ai/api/v1
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  GENERATION_MODEL: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
-  EMBEDDING_MODEL: nvidia/nemotron-3-embed-1b:free
-  EMBEDDING_DIMENSIONS: "2048"
+  GENERATION_MODEL: ${{ secrets.GENERATION_MODEL }}
+  EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+  EMBEDDING_DIMENSIONS: ${{ secrets.EMBEDDING_DIMENSIONS }}
   
   # Knowledge base matching threshold
-  DYNAMIC_KB_THRESHOLD: "0.65"
+  DYNAMIC_KB_THRESHOLD: ${{ secrets.EB_MATCH_THRESHOLD }}
   
-  # Qdrant configuration (matches docker-compose service names)
-  QDRANT_HOST: localhost
-  QDRANT_PORT: "6333"
+  # Qdrant configuration
+  QDRANT_HOST: ${{ secrets.QDRANT_HOST }}
+  QDRANT_PORT: ${{ secrets.QDRANT_PORT }}
   
-  # MinIO configuration (matches docker-compose service names)
-  MINIO_ENDPOINT: localhost:9000
-  MINIO_ACCESS_KEY: minioadmin
-  MINIO_SECRET_KEY: minioadmin
-  MINIO_VISUAL_BUCKET: rag-assets
+  # MinIO configuration
+  MINIO_ENDPOINT: ${{ secrets.MINIO_ENDPOINT }}
+  MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+  MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+  MINIO_VISUAL_BUCKET: ${{ secrets.MINIO_BUCKET }}
 
 jobs:
   lint:
