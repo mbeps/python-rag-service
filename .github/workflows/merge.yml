@@ -120,22 +120,22 @@ jobs:
             echo "# OpenAI-compatible API configuration"
             echo "OPENAI_BASE_URL=${{ env.OPENAI_BASE_URL }}"
             echo "OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}"
-            echo "GENERATION_MODEL=${{ env.GENERATION_MODEL }}"
-            echo "EMBEDDING_MODEL=${{ env.EMBEDDING_MODEL }}"
-            echo "EMBEDDING_DIMENSIONS=${{ env.EMBEDDING_DIMENSIONS }}"
+            if [ -n "${{ env.GENERATION_MODEL }}" ]; then echo "GENERATION_MODEL=${{ env.GENERATION_MODEL }}"; fi
+            if [ -n "${{ env.EMBEDDING_MODEL }}" ]; then echo "EMBEDDING_MODEL=${{ env.EMBEDDING_MODEL }}"; fi
+            if [ -n "${{ env.EMBEDDING_DIMENSIONS }}" ]; then echo "EMBEDDING_DIMENSIONS=${{ env.EMBEDDING_DIMENSIONS }}"; fi
             echo ""
             echo "# Knowledge base matching threshold"
-            echo "DYNAMIC_KB_THRESHOLD=${{ env.DYNAMIC_KB_THRESHOLD }}"
+            if [ -n "${{ env.DYNAMIC_KB_THRESHOLD }}" ]; then echo "DYNAMIC_KB_THRESHOLD=${{ env.DYNAMIC_KB_THRESHOLD }}"; fi
             echo ""
             echo "# Qdrant configuration"
-            echo "QDRANT_HOST=${{ env.QDRANT_HOST }}"
-            echo "QDRANT_PORT=${{ env.QDRANT_PORT }}"
+            if [ -n "${{ env.QDRANT_HOST }}" ]; then echo "QDRANT_HOST=${{ env.QDRANT_HOST }}"; fi
+            if [ -n "${{ env.QDRANT_PORT }}" ]; then echo "QDRANT_PORT=${{ env.QDRANT_PORT }}"; fi
             echo ""
             echo "# MinIO configuration"
-            echo "MINIO_ENDPOINT=${{ env.MINIO_ENDPOINT }}"
-            echo "MINIO_ACCESS_KEY=${{ env.MINIO_ACCESS_KEY }}"
-            echo "MINIO_SECRET_KEY=${{ env.MINIO_SECRET_KEY }}"
-            echo "MINIO_VISUAL_BUCKET=${{ env.MINIO_VISUAL_BUCKET }}"
+            if [ -n "${{ env.MINIO_ENDPOINT }}" ]; then echo "MINIO_ENDPOINT=${{ env.MINIO_ENDPOINT }}"; fi
+            if [ -n "${{ env.MINIO_ACCESS_KEY }}" ]; then echo "MINIO_ACCESS_KEY=${{ env.MINIO_ACCESS_KEY }}"; fi
+            if [ -n "${{ env.MINIO_SECRET_KEY }}" ]; then echo "MINIO_SECRET_KEY=${{ env.MINIO_SECRET_KEY }}"; fi
+            if [ -n "${{ env.MINIO_VISUAL_BUCKET }}" ]; then echo "MINIO_VISUAL_BUCKET=${{ env.MINIO_VISUAL_BUCKET }}"; fi
           } > .env
               
       - name: Run Test Suite

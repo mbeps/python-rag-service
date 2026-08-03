@@ -73,3 +73,15 @@ def test_openai_api_key_blank_becomes_none(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "   ")
     settings = Settings(_env_file=None)
     assert settings.OPENAI_API_KEY is None
+
+
+def test_settings_ignore_empty_env(monkeypatch):
+    """Test that empty-string env vars are ignored and defaults are used."""
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "")
+    monkeypatch.setenv("DYNAMIC_KB_THRESHOLD", "")
+    monkeypatch.setenv("QDRANT_PORT", "")
+
+    settings = Settings(_env_file=None)
+    assert settings.EMBEDDING_DIMENSIONS == 1536
+    assert settings.DYNAMIC_KB_THRESHOLD == 0.65
+    assert settings.QDRANT_PORT == 6333
