@@ -55,5 +55,6 @@ async def generator_node(state: AgentState) -> AgentState:
         temperature=0.0,
     )
 
-    state.answer = response.choices[0].message.content
+    # ponytail: ensure answer is never None (robustness fix)
+    state.answer = response.choices[0].message.content or ""
     return state

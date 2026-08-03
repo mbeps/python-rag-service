@@ -1,26 +1,24 @@
 from typing import cast
-
-from src.config.settings import get_settings
+from qdrant_client import AsyncQdrantClient
+from src.config.settings import get_settings, settings
 from src.schemas.agent_state import AgentState
 from src.utils.openai_client import get_openai_client
 from src.utils.qdrant_manager import QdrantManager
 
 
+def get_qdrant_client() -> AsyncQdrantClient:
+    """Creates a temporary async client for the node."""
+    return AsyncQdrantClient(
+        host=settings.QDRANT_HOST,
+        port=settings.QDRANT_PORT,
+        api_key=settings.QDRANT_API_KEY,
+    )
+
+
 def _sanitise_document(
     payload: dict[str, object],
 ) -> dict[str, str | int | float | bool]:
-    """Map a Qdrant payload to the fields the agent state can hold.
-
-    Qdrant payloads contain untyped extras (None, lists, base64 blobs) that
-    ``AgentState.documents`` cannot validate; keep only fields used downstream
-    and expose the chunk text under 'content'.
-
-    Args:
-        payload: Raw point payload from Qdrant.
-
-    Returns:
-        A scalar-typed document dict for the agent state.
-    """
+    """Map a Qdrant payload to the fields the agent state can hold."""
     doc: dict[str, str | int | float | bool] = {
         "content": str(payload.get("text") or payload.get("content") or ""),
         "kb_id": str(payload.get("kb_id") or ""),
@@ -35,62 +33,47 @@ def _sanitise_document(
 
 
 async def retriever_node(state: AgentState) -> AgentState:
-    """Retrieves relevant documents from the knowledge base.
-
-    Args:
-        state (AgentState): The current state of the agent, including
-            'query', 'kb_id', and optionally 'rewritten_query'.
-
-    Returns:
-        AgentState: The updated state with 'documents' populated
-            from the search results.
-    """
+    """Retrieves relevant documents from the knowledge base."""
     settings = get_settings()
 
-    # Initialize QdrantManager
-    qdrant_manager = QdrantManager(
-        host=settings.QDRANT_HOST,
-        port=settings.QDRANT_PORT,
-        api_key=settings.QDRANT_API_KEY,
-    )
+    # ponytail: The node currently creates its own client; in production,
+    # this should be passed in via RunnableConfig if possible.
+    client = get_qdrant_client()
+    qdrant_manager = QdrantManager(client=client)
 
-    # Select query: rewritten_query takes precedence
-    # We support both dict and AgentState object for robustness in LangGraph
-    if isinstance(state, dict):
-        query = state.get("rewritten_query") or state.get("query")
-        kb_id = state.get("kb_id")
-    else:
-        query = state.rewritten_query or state.query
-        kb_id = state.kb_id
+    try:
+        if isinstance(state, dict):
+            query = state.get("rewritten_query") or state.get("query")
+            kb_id = state.get("kb_id")
+        else:
+            query = state.rewritten_query or state.query
+            kb_id = state.kb_id
 
-    # Embed the query with the same model used during ingestion
-    query_text = cast(str, query)
-    client = get_openai_client()
-    response = await client.embeddings.create(
-        input=query_text,
-        model=settings.EMBEDDING_MODEL,
-        encoding_format="float",
-    )
-    query_vector = response.data[0].embedding
+        query_text = cast(str, query)
+        openai_client = get_openai_client()
+        response = await openai_client.embeddings.create(
+            input=query_text,
+            model=settings.EMBEDDING_MODEL,
+            encoding_format="float",
+        )
+        query_vector = response.data[0].embedding
 
-    # Perform search
-    # ponytail: search currently assumes 'knowledge_base' collection.
-    results = await qdrant_manager.search(
-        collection_name="knowledge_base",
-        query_vector=query_vector,
-        kb_id=kb_id,
-        limit=5,
-    )
+        results = await qdrant_manager.search(
+            collection_name="knowledge_base",
+            query_vector=query_vector,
+            kb_id=kb_id,
+            limit=5,
+        )
 
-    # Convert ScoredPoint results to sanitised metadata dicts for the state
-    documents = [
-        _sanitise_document(point.payload) for point in results if point.payload
-    ]
+        documents = [
+            _sanitise_document(point.payload) for point in results if point.payload
+        ]
 
-    # Update and return state
-    if isinstance(state, dict):
-        state["documents"] = documents
-    else:
-        state.documents = documents
+        if isinstance(state, dict):
+            state["documents"] = documents
+        else:
+            state.documents = documents
 
-    return state
+        return state
+    finally:
+        await client.close()

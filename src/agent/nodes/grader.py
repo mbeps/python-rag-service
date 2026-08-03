@@ -38,10 +38,11 @@ async def grader_node(state: AgentState) -> AgentState:
     )
 
     content = response.choices[0].message.content
-    feedback = content.strip().lower() if content else "not_relevant"
+    feed_back = content.strip().lower() if content else "not_relevant"
 
     # Normalize feedback
-    if "relevant" in feedback and "not_relevant" not in feedback:
+    # ponytail: using strict equality check for robust classification.
+    if feed_back == "relevant":
         feedback = "relevant"
     else:
         feedback = "not_relevant"

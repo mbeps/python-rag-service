@@ -1,6 +1,5 @@
 from typing import Literal
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from src.agent.nodes.generator import generator_node
@@ -10,16 +9,26 @@ from src.agent.nodes.rewriter import rewriter_node
 from src.schemas.agent_state import AgentState
 
 
-def decide_next_step(state: AgentState) -> Literal["generator", "rewriter"]:
+def decide_next_step(state: AgentState) -> Literal["generator", "rewriter", "generate"]:
     """Determines whether to proceed to generation or rewrite the query.
 
     Args:
-        state (AgentState): The current state containing grader feedback.
+        state (AgentState): The current state containing grader feedback and loop counter.
 
     Returns:
-        Literal["generator", "rewriter"]: The next node to execute.
+        Literal["generator", "rewriter", "generate"]: The next node to execute.
     """
-    if state.grader_feedback == "relevant":
+    # ponytail: supporting both dict and object access for LangGraph state robustness.
+    loop_step = state["loop_step"] if isinstance(state, dict) else state.loop_step
+
+    if loop_step >= 3:
+        # ponytail: cap iterations at 3 to prevent infinite loops.
+        return "generate"
+
+    grader_feedback = (
+        state["grader_feedback"] if isinstance(state, dict) else state.grader_feedback
+    )
+    if grader_feedback == "relevant":
         return "generator"
     return "rewriter"
 
@@ -43,6 +52,7 @@ workflow.add_conditional_edges(
     decide_next_step,
     {
         "generator": "generator",
+        "generate": "generator",
         "rewriter": "rewriter",
     },
 )
@@ -53,9 +63,7 @@ workflow.add_edge("rewriter", "retriever")
 # End path
 workflow.add_edge("generator", END)
 
-# Checkpointer for state persistence
-# ponytail: using MemorySaver as a simple in-memory checkpointer.
-checkpointer = MemorySaver()
-
 # Final app compilation
-app = workflow.compile(checkpointer=checkpointer)
+# ponytail: Removed MemorySaver to prevent memory leaks in production (H7).
+# For conversational memory, a database-backed checkpointer should be used.
+app = workflow.compile()

@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List
-from unstructured.partition.pdf import partition_pdf
+from unstructured.partition.auto import partition
 from unstructured.chunking.title import chunk_by_title
 from unstructured.documents.elements import Element
 
@@ -21,11 +21,13 @@ class DocumentPartitioner:
         Returns:
             List[Element]: A list of chunked elements from the document.
         """
-        # Partition the document
-        # ponytail: hi_res requires system tesseract; fast uses pdfminer which
-        # handles text-based PDFs. Upgrade path: install tesseract and change to "hi_res".
-        elements = partition_pdf(
-            filename=str(file_path), pdf_infer_table_structure=True, strategy="fast"
+        # Partition the document using the auto-partitioner to support multiple formats
+        # ponytail: hi_res requires system tesseract; fast handles text-based documents efficiently.
+        # ponytail: skip_infer_table_types is used to avoid deprecated pdf_infer_table_structure warning.
+        elements = partition(
+            filename=str(file_path),
+            skip_infer_table_types=[],  # Ensures table inference if desired for PDFs
+            strategy="fast",
         )
 
         # Chunk elements by title to preserve semantic structure

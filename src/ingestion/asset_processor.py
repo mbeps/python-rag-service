@@ -105,7 +105,12 @@ class AssetProcessor:
 
             processed_chunks.append(
                 ProcessedChunk(
-                    text=text, image_url=image_url, metadata=metadata, kb_id=kb_id
+                    text=text,
+                    image_url=image_url,
+                    metadata=metadata,
+                    kb_id=kb_id,
+                    document_id=metadata.get("document_id", "pending"),
+                    chunk_id=metadata.get("chunk_id", "pending"),
                 )
             )
 

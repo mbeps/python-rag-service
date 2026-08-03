@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from qdrant_client.http.models import PointStruct
@@ -36,8 +37,8 @@ class IngestionService:
         self.asset_manager = asset_manager
 
         self.openai_client = get_openai_client()
-        # ponytail: "knowledge_base" is the default collection as per request.
-        self.collection_name = "knowledge_base"
+        # ponytail: use the collection name from settings.
+        self.collection_name = self.settings.QDRANT_COLLECTION
 
     async def register_kb(self, kb_id: str, name: str, description: str) -> None:
         """
@@ -93,6 +94,17 @@ class IngestionService:
         Returns:
             None
         """
+        # 0. Generate Document ID and handle idempotency
+        file_content = file_path.read_bytes()
+        document_id = hashlib.sha256(file_content).hexdigest()
+
+        # Idempotency: Delete existing chunks of this document in this KB
+        await self.metadata_manager.delete_points_by_filter(
+            collection_name=self.collection_name,
+            kb_id=kb_id,
+            document_id=document_id,
+        )
+
         # 1. Partition & Chunk
         partitioner = DocumentPartitioner()
         chunks = partitioner.partition_and_chunk(file_path)
@@ -108,7 +120,10 @@ class IngestionService:
         )
 
         points = []
-        for chunk in processed_chunks:
+        for i, chunk in enumerate(processed_chunks):
+            # Generate deterministic chunk ID
+            chunk_id = str(uuid.uuid5(uuid.UUID(hex=document_id[:32]), str(i)))
+
             # Generate embedding using OpenAI-compatible API
             response = await self.openai_client.embeddings.create(
                 input=chunk.text,
@@ -120,14 +135,14 @@ class IngestionService:
             # Prepare metadata payload
             payload = {
                 "text": chunk.text,
-                "kb_id": chunk.kb_id,
+                "kb_id": kb_id,
+                "document_id": document_id,
+                "chunk_id": chunk_id,
                 "image_url": chunk.image_url,
                 **chunk.metadata,
             }
 
-            points.append(
-                PointStruct(id=str(uuid.uuid4()), vector=vector, payload=payload)
-            )
+            points.append(PointStruct(id=chunk_id, vector=vector, payload=payload))
 
         # 4. Batch Upsert to Qdrant
         if points:

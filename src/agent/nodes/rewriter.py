@@ -1,11 +1,9 @@
-from typing import Union
-
 from src.schemas.agent_state import AgentState
 from src.config.settings import get_settings
 from src.utils.openai_client import get_openai_client
 
 
-async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dict]:
+async def rewriter_node(state: AgentState) -> AgentState:
     """Reformulates the user query to better match document search patterns.
 
     This node uses an LLM to rewrite the query into a form more conducive
@@ -23,15 +21,17 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
     client = get_openai_client()
 
     if isinstance(state, dict):
-        query = state.get("query", "")
+        query = state.get("rewritten_query") or state.get("query") or ""
+        loop_step = state.get("loop_step", 0)
     else:
-        query = state.query
+        query = state.rewritten_query or state.query
+        loop_step = state.loop_step
 
     prompt = (
         "You are a search query optimizer. Your goal is to rewrite the user's "
         "query into a concise, keyword-rich search term that will return the "
         "most relevant documents from a vector database.\n\n"
-        f"Original Query: {query}\n\n"
+        f"Query context: {query}\n\n"
         "Rewritten Query:"
     )
 
@@ -49,7 +49,9 @@ async def rewriter_node(state: Union[AgentState, dict]) -> Union[AgentState, dic
 
     if isinstance(state, dict):
         state["rewritten_query"] = rewritten_query
+        state["loop_step"] = loop_step + 1
     else:
         state.rewritten_query = rewritten_query
+        state.loop_step = loop_step + 1
 
     return state
