@@ -17,7 +17,6 @@ services:
   qdrant:
     build:
       dockerfile: Dockerfile.qdrant
-    image: qdrant-custom:latest
     ports:
       - "6333:6333"
     volumes:
