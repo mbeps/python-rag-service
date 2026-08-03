@@ -1,0 +1,67 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+        options: >-
+          --health-cmd "curl -f http://localhost:6333/healthz"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        command: server /data
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          
+      - name: Install dependencies
+        run: uv sync --dev
+        
+      - name: Ruff Lint Check
+        run: uv run ruff check .
+        
+      - name: Ruff Format Check
+        run: uv run ruff format --check .
+        
+      - name: MyPy Type Check
+        run: uv run mypy .
+        
+      - name: Pyrefly Architecture Check
+        run: uv run pyrefly check
+        
+      - name: Run Test Suite
+        run: uv run pytest
+        env:
+          QDRANT_HOST: localhost
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
