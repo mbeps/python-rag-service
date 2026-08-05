@@ -1,5 +1,7 @@
 .github/**.md
-.github/instructions/**
+.github/**
+!.github/workflows/**
+
 docs/**
 checklist.md
 **.pyc
